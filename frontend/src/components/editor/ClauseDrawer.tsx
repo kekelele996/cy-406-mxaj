@@ -15,15 +15,18 @@ export function ClauseDrawer({ visible, clauses, onClose, onInsert }: ClauseDraw
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('all');
 
+  // 停用的条款不再出现在抽屉中；已插入正文的内容不受影响。
+  const availableClauses = useMemo(() => clauses.filter((clause) => clause.enabled !== false), [clauses]);
+
   const options = Object.values(ClauseCategory).map((value) => ({
     value,
     label: CLAUSE_CATEGORY_LABELS[value],
-    count: clauses.filter((clause) => clause.category === value).length
+    count: availableClauses.filter((clause) => clause.category === value).length
   }));
 
   const filtered = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-    return clauses.filter((clause) => {
+    return availableClauses.filter((clause) => {
       const categoryMatched = category === 'all' || clause.category === category;
       const keywordMatched =
         !normalizedKeyword ||
@@ -31,7 +34,7 @@ export function ClauseDrawer({ visible, clauses, onClose, onInsert }: ClauseDraw
         clause.tags.some((tag) => tag.toLowerCase().includes(normalizedKeyword));
       return categoryMatched && keywordMatched;
     });
-  }, [category, clauses, keyword]);
+  }, [availableClauses, category, keyword]);
 
   return (
     <Drawer visible={visible} placement="bottom" height="72vh" title="条款库" onCancel={onClose} footer={null}>
@@ -43,6 +46,7 @@ export function ClauseDrawer({ visible, clauses, onClose, onInsert }: ClauseDraw
             <ClauseCard key={clause.id} clause={clause} onInsert={onInsert} />
           ))}
         </div>
+        {!filtered.length && <div className="empty-state">没有可用条款，可在条款库中新增或恢复已停用条款。</div>}
       </Space>
     </Drawer>
   );

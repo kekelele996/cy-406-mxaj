@@ -9,6 +9,7 @@ import { useHistory } from '../hooks/useHistory';
 import { useClauseStore } from '../stores/clause';
 import { useTemplateStore } from '../stores/template';
 import { TemplateCategory, TEMPLATE_CATEGORY_LABELS } from '../types/enums';
+import { Clause } from '../types/clause';
 import { Template } from '../types/template';
 
 const categoryOptions = Object.values(TemplateCategory).map((value) => ({
@@ -93,6 +94,18 @@ export function TemplateEditor() {
     updateContent(nextContent);
   };
 
+  const insertClause = (clause: Clause) => {
+    const nextContent = `${draft.contentHtml}${clause.contentHtml}`;
+    // 记录引用，随模板保存落库；重复插入同一条款只记录一次。
+    const referencedClauseIds = draft.referencedClauseIds.includes(clause.id)
+      ? draft.referencedClauseIds
+      : [...draft.referencedClauseIds, clause.id];
+    setDraft({ ...draft, contentHtml: nextContent, referencedClauseIds });
+    contentHistory.push(nextContent);
+    void incrementUsage(clause.id);
+    Message.success('条款已插入正文末尾');
+  };
+
   const saveTemplate = async () => {
     await updateTemplate(draft);
     Message.success('模板已保存');
@@ -154,11 +167,7 @@ export function TemplateEditor() {
         visible={clauseDrawerVisible}
         clauses={clauses}
         onClose={() => setClauseDrawerVisible(false)}
-        onInsert={(clause) => {
-          insertHtml(clause.contentHtml);
-          void incrementUsage(clause.id);
-          Message.success('条款已插入正文末尾');
-        }}
+        onInsert={(clause) => insertClause(clause)}
       />
     </section>
   );

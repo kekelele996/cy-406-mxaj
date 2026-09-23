@@ -15,6 +15,8 @@ export interface Template {
   category: TemplateCategory;
   contentHtml: string;
   variables: TemplateVariable[];
+  /** 曾通过条款抽屉插入过的条款 id，用于判断条款是否被正文引用。 */
+  referencedClauseIds: string[];
   createdAt: string;
   updatedAt: string;
   tags: string[];

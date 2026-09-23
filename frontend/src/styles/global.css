@@ -169,6 +169,21 @@ body {
   margin-top: 18px;
 }
 
+.toolbar-row--compact {
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
+.clause-card--disabled {
+  opacity: 0.72;
+  background: var(--muted-bg, #f7f7f8);
+}
+
+.clause-card--disabled .clause-excerpt {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted);
+}
+
 .muted {
   color: var(--muted);
   font-size: 12px;

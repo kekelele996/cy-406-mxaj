@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { templateDb } from '../api/db';
 import { Template, TemplateDraft } from '../types/template';
 import { TemplateCategory } from '../types/enums';
-import { makeId, nowIso, putRecord } from '../utils/db';
+import { getAllRecords, makeId, nowIso, putRecord } from '../utils/db';
 import { seedTemplates } from '../utils/seed';
 
 interface TemplateHistory {
@@ -19,6 +19,8 @@ interface TemplateState {
   updateTemplate: (template: Template, trackHistory?: boolean) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
+  /** 判断条款是否曾被任意模板正文引用（用于限制删除）。 */
+  isClauseReferenced: (clauseId: string) => boolean;
   undoTemplateChange: () => Promise<void>;
   redoTemplateChange: () => Promise<void>;
 }
@@ -28,6 +30,7 @@ const defaultDraft: TemplateDraft = {
   category: TemplateCategory.Service,
   tags: ['草稿'],
   variables: [],
+  referencedClauseIds: [],
   contentHtml: '<h2>合同标题</h2><p>在此编辑正文，可使用 {{变量名}} 作为占位符。</p>'
 };
 
@@ -53,6 +56,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         await Promise.all(seedTemplates.map((template) => putRecord('templates', template)));
         templates = seedTemplates;
       }
+      templates = await backfillReferencedClauses(templates);
       set({ templates: sortTemplates(templates) });
     } finally {
       set({ loading: false });
@@ -107,8 +111,13 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       category: source.category,
       contentHtml: source.contentHtml,
       variables: source.variables.map((variable) => ({ ...variable, id: makeId('var') })),
+      referencedClauseIds: [...source.referencedClauseIds],
       tags: [...source.tags, '副本']
     });
+  },
+
+  isClauseReferenced(clauseId) {
+    return get().templates.some((template) => template.referencedClauseIds.includes(clauseId));
   },
 
   async undoTemplateChange() {
@@ -147,3 +156,44 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     });
   }
 }));
+
+/**
+ * 兼容旧版 IndexedDB 数据：升级前插入过条款的模板没有 referencedClauseIds。
+ * 若模板正文中仍能匹配到条款原文，则按“已引用”补齐，避免旧条款被误删；
+ * 匹配不到（条款已移除或正文已改写）则维持空引用。每个会话只扫描一次。
+ */
+let clauseBackfillScanned = false;
+
+async function backfillReferencedClauses(templates: Template[]): Promise<Template[]> {
+  if (clauseBackfillScanned) {
+    return templates;
+  }
+  clauseBackfillScanned = true;
+
+  const clauses = await getAllRecords('clauses');
+  if (clauses.length === 0) {
+    return templates;
+  }
+
+  const toPersist: Template[] = [];
+  const next = templates.map((template) => {
+    if (template.referencedClauseIds.length > 0) {
+      return template;
+    }
+
+    // 模板正文逐字包含整条条款 HTML，即视为升级前通过抽屉插入过（真引用）。
+    const matched = clauses
+      .filter((clause) => clause.contentHtml.length > 0 && template.contentHtml.includes(clause.contentHtml))
+      .map((clause) => clause.id);
+    if (matched.length === 0) {
+      return template;
+    }
+
+    const result = { ...template, referencedClauseIds: matched };
+    toPersist.push(result);
+    return result;
+  });
+
+  await Promise.all(toPersist.map((template) => templateDb.save(template)));
+  return next;
+}

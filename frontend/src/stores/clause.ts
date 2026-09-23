@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { clauseDb } from '../api/db';
-import { Clause, ClauseDraft } from '../types/clause';
+import { Clause, ClauseDraft, ClauseReferencedError } from '../types/clause';
 import { ClauseCategory } from '../types/enums';
 import { makeId, nowIso, putRecord } from '../utils/db';
 import { seedClauses } from '../utils/seed';
+import { useTemplateStore } from './template';
 
 interface ClauseState {
   clauses: Clause[];
@@ -14,6 +15,12 @@ interface ClauseState {
   deleteClause: (id: string) => Promise<void>;
   duplicateClause: (id: string) => Promise<Clause | undefined>;
   incrementUsage: (id: string) => Promise<void>;
+  /** 停用条款：已被模板引用也可停用；写入失败时保留原状态。 */
+  disableClause: (id: string) => Promise<void>;
+  /** 恢复启用：写入失败时保留原状态。 */
+  enableClause: (id: string) => Promise<void>;
+  setClauseEnabled: (id: string, enabled: boolean) => Promise<void>;
+  isReferenced: (id: string) => boolean;
 }
 
 const defaultDraft: ClauseDraft = {
@@ -57,6 +64,7 @@ export const useClauseStore = create<ClauseState>((set, get) => ({
       ...draft,
       id: makeId('clause'),
       usageCount: 0,
+      enabled: true,
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -73,6 +81,10 @@ export const useClauseStore = create<ClauseState>((set, get) => ({
   },
 
   async deleteClause(id) {
+    if (useTemplateStore.getState().isClauseReferenced(id)) {
+      throw new ClauseReferencedError(id);
+    }
+
     await clauseDb.remove(id);
     set((state) => ({ clauses: state.clauses.filter((clause) => clause.id !== id) }));
   },
@@ -98,5 +110,30 @@ export const useClauseStore = create<ClauseState>((set, get) => ({
     }
 
     await get().updateClause({ ...clause, usageCount: clause.usageCount + 1 });
+  },
+
+  async disableClause(id) {
+    await get().setClauseEnabled(id, false);
+  },
+
+  async enableClause(id) {
+    await get().setClauseEnabled(id, true);
+  },
+
+  async setClauseEnabled(id, enabled) {
+    const clause = get().clauses.find((item) => item.id === id);
+    // 重复停用或恢复不产生写入，状态本就一致。
+    if (!clause || clause.enabled === enabled) {
+      return;
+    }
+
+    // 先落库再更新内存；写入失败时抛出异常，内存保留原状态。
+    const next = { ...clause, enabled, updatedAt: nowIso() };
+    await clauseDb.save(next);
+    set((state) => ({ clauses: upsertClause(state.clauses, next) }));
+  },
+
+  isReferenced(id) {
+    return useTemplateStore.getState().isClauseReferenced(id);
   }
 }));

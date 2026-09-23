@@ -37,6 +37,22 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * 兼容历史 IndexedDB 数据：
+ * - 旧条款没有 enabled 字段，缺省视为启用；
+ * - 旧模板没有 referencedClauseIds 字段，缺省为空数组（不影响已插入的正文）。
+ */
+export function normalizeClause(raw: Clause): Clause {
+  return { ...raw, enabled: raw.enabled !== false };
+}
+
+export function normalizeTemplate(raw: Template): Template {
+  return {
+    ...raw,
+    referencedClauseIds: Array.isArray(raw.referencedClauseIds) ? raw.referencedClauseIds : []
+  };
+}
+
 export function getDb() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
@@ -55,18 +71,31 @@ export function getDb() {
 
 export async function getAllRecords<S extends StoreName>(storeName: S): Promise<StoreValue<S>[]> {
   const db = await getDb();
-  return (await db.getAll(storeName)) as StoreValue<S>[];
+  const records = (await db.getAll(storeName)) as StoreValue<S>[];
+  return records.map((record) => normalizeRecord(storeName, record));
 }
 
 export async function getRecord<S extends StoreName>(storeName: S, id: string): Promise<StoreValue<S> | undefined> {
   const db = await getDb();
-  return (await db.get(storeName, id)) as StoreValue<S> | undefined;
+  const record = (await db.get(storeName, id)) as StoreValue<S> | undefined;
+  return record ? normalizeRecord(storeName, record) : undefined;
+}
+
+function normalizeRecord<S extends StoreName>(storeName: S, record: StoreValue<S>): StoreValue<S> {
+  if (storeName === 'clauses') {
+    return normalizeClause(record as Clause) as StoreValue<S>;
+  }
+  if (storeName === 'templates') {
+    return normalizeTemplate(record as Template) as StoreValue<S>;
+  }
+  return record;
 }
 
 export async function putRecord<S extends StoreName>(storeName: S, record: StoreValue<S>) {
   const db = await getDb();
-  await db.put(storeName, record);
-  return record;
+  const normalized = normalizeRecord(storeName, record);
+  await db.put(storeName, normalized);
+  return normalized;
 }
 
 export async function deleteRecord(storeName: StoreName, id: string) {
@@ -105,7 +134,7 @@ export async function importAllData(payload: Partial<ExportPayload>) {
     await store.clear();
     const records = (payload[storeName] ?? []) as StoreValue<typeof storeName>[];
     for (const record of records) {
-      await store.put(record);
+      await store.put(normalizeRecord(storeName, record));
     }
   }
 
