@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { CategoryFilter, ClauseCard } from '../common';
 import { Clause } from '../../types/clause';
 import { CLAUSE_CATEGORY_LABELS, ClauseCategory } from '../../types/enums';
+import { isClauseActive } from '../../utils/clause';
 
 interface ClauseDrawerProps {
   visible: boolean;
@@ -15,15 +16,18 @@ export function ClauseDrawer({ visible, clauses, onClose, onInsert }: ClauseDraw
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('all');
 
+  // 停用的条款不再提供插入，恢复启用后立即重新可选
+  const availableClauses = useMemo(() => clauses.filter(isClauseActive), [clauses]);
+
   const options = Object.values(ClauseCategory).map((value) => ({
     value,
     label: CLAUSE_CATEGORY_LABELS[value],
-    count: clauses.filter((clause) => clause.category === value).length
+    count: availableClauses.filter((clause) => clause.category === value).length
   }));
 
   const filtered = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-    return clauses.filter((clause) => {
+    return availableClauses.filter((clause) => {
       const categoryMatched = category === 'all' || clause.category === category;
       const keywordMatched =
         !normalizedKeyword ||
@@ -31,7 +35,7 @@ export function ClauseDrawer({ visible, clauses, onClose, onInsert }: ClauseDraw
         clause.tags.some((tag) => tag.toLowerCase().includes(normalizedKeyword));
       return categoryMatched && keywordMatched;
     });
-  }, [category, clauses, keyword]);
+  }, [availableClauses, category, keyword]);
 
   return (
     <Drawer visible={visible} placement="bottom" height="72vh" title="条款库" onCancel={onClose} footer={null}>

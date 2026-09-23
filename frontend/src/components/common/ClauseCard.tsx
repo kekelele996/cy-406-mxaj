@@ -1,7 +1,8 @@
 import { Button, Card, Popconfirm, Space, Tag, Typography } from '@arco-design/web-react';
-import { IconCopy, IconDelete, IconEdit, IconPlus } from '@arco-design/web-react/icon';
+import { IconCopy, IconDelete, IconEdit, IconPlayArrow, IconPlus, IconStop } from '@arco-design/web-react/icon';
 import { Clause } from '../../types/clause';
-import { CLAUSE_CATEGORY_LABELS } from '../../types/enums';
+import { CLAUSE_CATEGORY_LABELS, CLAUSE_STATUS_LABELS, ClauseStatus } from '../../types/enums';
+import { isClauseActive } from '../../utils/clause';
 import { htmlToPlainText } from '../../utils/diff';
 
 interface ClauseCardProps {
@@ -10,14 +11,20 @@ interface ClauseCardProps {
   onDuplicate?: (clause: Clause) => void;
   onDelete?: (clause: Clause) => void;
   onInsert?: (clause: Clause) => void;
+  onToggleStatus?: (clause: Clause) => void;
 }
 
-export function ClauseCard({ clause, onEdit, onDuplicate, onDelete, onInsert }: ClauseCardProps) {
+export function ClauseCard({ clause, onEdit, onDuplicate, onDelete, onInsert, onToggleStatus }: ClauseCardProps) {
+  const active = isClauseActive(clause);
+
   return (
-    <Card className="clause-card" hoverable>
+    <Card className={`clause-card${active ? '' : ' clause-card--disabled'}`} hoverable>
       <div className="template-card__header">
         <Typography.Title heading={6}>{clause.title}</Typography.Title>
-        <Tag color="orangered">{CLAUSE_CATEGORY_LABELS[clause.category]}</Tag>
+        <Space size={4}>
+          <Tag color="orangered">{CLAUSE_CATEGORY_LABELS[clause.category]}</Tag>
+          {!active && <Tag color="gray">{CLAUSE_STATUS_LABELS[ClauseStatus.Disabled]}</Tag>}
+        </Space>
       </div>
       <Typography.Paragraph className="clause-excerpt" ellipsis={{ rows: 2 }}>
         {htmlToPlainText(clause.contentHtml)}
@@ -46,6 +53,15 @@ export function ClauseCard({ clause, onEdit, onDuplicate, onDelete, onInsert }: 
         {onDuplicate && (
           <Button icon={<IconCopy />} onClick={() => onDuplicate(clause)}>
             复制
+          </Button>
+        )}
+        {onToggleStatus && (
+          <Button
+            icon={active ? <IconStop /> : <IconPlayArrow />}
+            status={active ? 'warning' : 'success'}
+            onClick={() => onToggleStatus(clause)}
+          >
+            {active ? '停用' : '启用'}
           </Button>
         )}
         {onDelete && (

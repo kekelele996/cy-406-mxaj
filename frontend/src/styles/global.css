@@ -150,6 +150,10 @@ body {
   gap: 12px;
 }
 
+.clause-card--disabled {
+  opacity: 0.6;
+}
+
 .template-card__meta {
   display: flex;
   gap: 14px;

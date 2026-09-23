@@ -1,4 +1,4 @@
-import { ClauseCategory } from './enums';
+import { ClauseCategory, ClauseStatus } from './enums';
 
 export interface Clause {
   id: string;
@@ -7,8 +7,9 @@ export interface Clause {
   contentHtml: string;
   tags: string[];
   usageCount: number;
+  status: ClauseStatus;
   createdAt: string;
   updatedAt: string;
 }
 
-export type ClauseDraft = Omit<Clause, 'id' | 'usageCount' | 'createdAt' | 'updatedAt'>;
+export type ClauseDraft = Omit<Clause, 'id' | 'usageCount' | 'status' | 'createdAt' | 'updatedAt'>;

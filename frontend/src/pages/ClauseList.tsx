@@ -4,19 +4,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { CategoryFilter, ClauseCard } from '../components/common';
 import { ClauseEditor } from '../components/editor/ClauseEditor';
 import { useClauseStore } from '../stores/clause';
+import { useTemplateStore } from '../stores/template';
 import { Clause, ClauseDraft } from '../types/clause';
-import { CLAUSE_CATEGORY_LABELS, ClauseCategory } from '../types/enums';
+import { CLAUSE_CATEGORY_LABELS, ClauseCategory, ClauseStatus } from '../types/enums';
+import { isClauseActive, isClauseReferenced } from '../utils/clause';
 
 export function ClauseList() {
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('all');
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingClause, setEditingClause] = useState<Clause | undefined>();
-  const { clauses, loadClauses, createClause, updateClause, deleteClause, duplicateClause } = useClauseStore();
+  const { clauses, loadClauses, createClause, updateClause, setClauseStatus, deleteClause, duplicateClause } = useClauseStore();
+  const { templates, loadTemplates } = useTemplateStore();
 
   useEffect(() => {
     void loadClauses();
-  }, [loadClauses]);
+    void loadTemplates();
+  }, [loadClauses, loadTemplates]);
+
+  const referencedIds = useMemo(
+    () => new Set(clauses.filter((clause) => isClauseReferenced(clause, templates)).map((clause) => clause.id)),
+    [clauses, templates]
+  );
 
   const categoryOptions = Object.values(ClauseCategory).map((value) => ({
     value,
@@ -51,6 +60,26 @@ export function ClauseList() {
     }
   };
 
+  const toggleStatus = async (clause: Clause) => {
+    const nextStatus = isClauseActive(clause) ? ClauseStatus.Disabled : ClauseStatus.Active;
+    try {
+      await setClauseStatus(clause.id, nextStatus);
+      Message.success(nextStatus === ClauseStatus.Disabled ? '条款已停用' : '条款已恢复启用');
+    } catch {
+      Message.error('状态更新失败，已保留原状态');
+    }
+  };
+
+  const removeClause = async (clause: Clause) => {
+    if (referencedIds.has(clause.id)) {
+      Message.warning('该条款已被模板正文引用，无法删除，可改为停用');
+      return;
+    }
+
+    await deleteClause(clause.id);
+    Message.success('条款已删除');
+  };
+
   return (
     <section className="page-section">
       <div className="page-heading">
@@ -80,7 +109,8 @@ export function ClauseList() {
               setEditorVisible(true);
             }}
             onDuplicate={() => void duplicateClause(clause.id)}
-            onDelete={() => void deleteClause(clause.id)}
+            onToggleStatus={() => void toggleStatus(clause)}
+            onDelete={referencedIds.has(clause.id) ? undefined : () => void removeClause(clause)}
           />
         ))}
       </div>

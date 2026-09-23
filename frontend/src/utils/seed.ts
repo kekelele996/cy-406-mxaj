@@ -1,6 +1,6 @@
 import { Clause } from '../types/clause';
 import { ContractInstance } from '../types/contract-instance';
-import { ClauseCategory, ContractStatus, TemplateCategory, VariableType } from '../types/enums';
+import { ClauseCategory, ClauseStatus, ContractStatus, TemplateCategory, VariableType } from '../types/enums';
 import { Template } from '../types/template';
 import { Version } from '../types/version';
 import { makeId, nowIso } from './db';
@@ -48,6 +48,7 @@ export const seedClauses: Clause[] = [
     category: ClauseCategory.Payment,
     tags: ['付款', '违约金'],
     usageCount: 0,
+    status: ClauseStatus.Active,
     createdAt,
     updatedAt: createdAt,
     contentHtml: '<h3>付款违约责任</h3><p>任何一方逾期付款的，应按逾期金额每日万分之五向守约方支付违约金。</p>'
@@ -58,6 +59,7 @@ export const seedClauses: Clause[] = [
     category: ClauseCategory.Dispute,
     tags: ['仲裁', '争议解决'],
     usageCount: 0,
+    status: ClauseStatus.Active,
     createdAt,
     updatedAt: createdAt,
     contentHtml: '<h3>争议解决</h3><p>因本合同产生的争议，双方应先行友好协商；协商不成的，提交签约地仲裁委员会仲裁。</p>'
@@ -68,6 +70,7 @@ export const seedClauses: Clause[] = [
     category: ClauseCategory.Ip,
     tags: ['成果', '知识产权'],
     usageCount: 0,
+    status: ClauseStatus.Active,
     createdAt,
     updatedAt: createdAt,
     contentHtml: '<h3>知识产权</h3><p>履约过程中形成的交付成果及相关知识产权，除双方另有约定外，归委托方所有。</p>'

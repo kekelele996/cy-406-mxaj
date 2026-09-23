@@ -16,6 +16,11 @@ export enum ClauseCategory {
   Termination = 'termination'
 }
 
+export enum ClauseStatus {
+  Active = 'active',
+  Disabled = 'disabled'
+}
+
 export enum ContractStatus {
   Draft = 'draft',
   Finalized = 'finalized',
@@ -46,6 +51,11 @@ export const CLAUSE_CATEGORY_LABELS: Record<ClauseCategory, string> = {
   [ClauseCategory.Ip]: '知识产权',
   [ClauseCategory.Payment]: '付款',
   [ClauseCategory.Termination]: '终止'
+};
+
+export const CLAUSE_STATUS_LABELS: Record<ClauseStatus, string> = {
+  [ClauseStatus.Active]: '启用中',
+  [ClauseStatus.Disabled]: '已停用'
 };
 
 export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
